@@ -1,0 +1,133 @@
+{% extends "books/base.html" %}
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-7 col-md-9 col-sm-12">
+
+    <div class="card shadow-lg border-0 rounded-4 p-5 mt-5">
+      <h2 class="fw-bold text-center mb-4">📚 Smart Book Search</h2>
+      <p class="text-center text-muted mb-4">
+        Type at least 1 letter to see instant suggestions powered by Elasticsearch
+      </p>
+
+      <form method="get" action="{% url 'search' %}" id="search-form" autocomplete="off">
+
+        <div class="position-relative">
+
+          <!-- Input group with icon -->
+          <div class="input-group input-group-lg shadow-sm">
+            <span class="input-group-text bg-white border-end-0 px-3">
+              <i class="bi bi-search fs-4 text-secondary"></i>
+            </span>
+            <input
+              id="search-input"
+              type="text"
+              name="q"
+              class="form-control border-start-0 fs-5"
+              placeholder="Search books by title..."
+              style="box-shadow: none;"
+            >
+            <button class="btn btn-primary px-4 fs-5" type="submit">
+              Search
+            </button>
+          </div>
+
+          <!-- Suggestions Dropdown -->
+          <div id="suggestions"
+               class="list-group position-absolute w-100 mt-2 shadow rounded-3"
+               style="z-index: 2000; display:none; max-height: 260px; overflow-y:auto;">
+          </div>
+
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+
+
+
+<!-- Bootstrap Icons for search icon -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+
+<script>
+(function(){
+  const input = document.getElementById('search-input');
+  const suggestionsEl = document.getElementById('suggestions');
+  let timer = null;
+
+  function debounce(fn, delay){
+    return function(...args){
+      clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    }
+  }
+
+  async function fetchSuggestions(q){
+    if (!q || q.length < 1) {
+      suggestionsEl.style.display = 'none';
+      suggestionsEl.innerHTML = '';
+      return;
+    }
+
+    try {
+      const res = await fetch(`/suggest/?q=${encodeURIComponent(q)}`);
+      if (!res.ok) throw new Error('Network error');
+
+      const data = await res.json();
+      showSuggestions(data.suggestions || []);
+    } catch (e) {
+      console.error('Suggestion error:', e)
+    }
+  }
+
+  function showSuggestions(list){
+    suggestionsEl.innerHTML = '';
+
+    if (!list.length) {
+      suggestionsEl.style.display = 'none';
+      return;
+    }
+
+    list.forEach(item => {
+      const a = document.createElement('a');
+      a.href = '#';
+      a.className = 'list-group-item list-group-item-action py-3 fs-6';
+      a.innerHTML = `<i class="bi bi-book text-primary me-2"></i> ${item.label}`;
+      a.dataset.title = item.title;
+
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        input.value = this.dataset.title;
+        suggestionsEl.style.display = 'none';
+      });
+
+      suggestionsEl.appendChild(a);
+    });
+
+    suggestionsEl.style.display = 'block';
+  }
+
+  const debouncedFetch = debounce((e) => {
+    fetchSuggestions(e.target.value);
+  }, 200);
+
+  input.addEventListener('input', debouncedFetch);
+
+  document.addEventListener('click', function(e){
+    if (!suggestionsEl.contains(e.target) && e.target !== input) {
+      suggestionsEl.style.display = 'none';
+    }
+  });
+
+  input.addEventListener('focus', function(){
+    if (input.value && suggestionsEl.children.length) {
+      suggestionsEl.style.display = 'block';
+    }
+  });
+})();
+</script>
+
+{% endblock %}
